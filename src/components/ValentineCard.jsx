@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart } from 'lucide-react';
+import { Heart, Volume2, VolumeX } from 'lucide-react';
 import InitialStage from './InitialStage.jsx';
 import QuestionStage from './QuestionStage.jsx';
 import FinalCardStage from './FinalCardStage.jsx';
@@ -20,6 +20,7 @@ export default function ValentineCard() {
   const [noButtonScale, setNoButtonScale] = useState(1);
   const [noButtonRotation, setNoButtonRotation] = useState(0);
   const [letterVisible, setLetterVisible] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const obsesionAudioRef = useRef(null);
   const samAudioRef = useRef(null);
   const FADE_DURATION_MS = 2000;
@@ -129,6 +130,19 @@ export default function ValentineCard() {
       window.removeEventListener('keydown', retryAfterInteraction);
     };
   }, [stage]);
+
+  useEffect(() => {
+    if (obsesionAudioRef.current) {
+      obsesionAudioRef.current.muted = isMuted;
+    }
+    if (samAudioRef.current) {
+      samAudioRef.current.muted = isMuted;
+    }
+  }, [isMuted]);
+
+  const handleToggleMute = () => {
+    setIsMuted((prev) => !prev);
+  };
 
   const handleCycleLanguage = () => {
     setCurrentLanguage((prev) => (prev + 1) % languages.length);
@@ -498,6 +512,32 @@ export default function ValentineCard() {
           animation: floatHeartMonogram 15s ease-in-out infinite;
         }
 
+        .music-pill {
+          position: fixed;
+          top: 14px;
+          right: 14px;
+          z-index: 1600;
+          border: 2px solid rgba(156, 39, 76, 0.25);
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 999px;
+          padding: 8px 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          color: #9c274c;
+          font-family: 'Crimson Text', serif;
+          font-size: 0.95rem;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .music-pill:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+        }
+
         /* Mobile tweaks */
         @media (max-width: 600px) {
           .title-main {
@@ -536,11 +576,24 @@ export default function ValentineCard() {
             margin: 0 auto;
           }
 
+          .music-pill {
+            top: 10px;
+            right: 10px;
+            padding: 7px 11px;
+            gap: 6px;
+            font-size: 0.85rem;
+          }
+
           body {
             background: none;
           }
         }
       `}</style>
+
+      <button className="music-pill" onClick={handleToggleMute} aria-label="Toggle music mute">
+        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        {isMuted ? 'Music Off' : 'Music On'}
+      </button>
 
       {/* Floating heart particles (Lucide hearts) */}
       {particles.map((particle) => (
