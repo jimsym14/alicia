@@ -108,6 +108,10 @@ export default function ValentineCard() {
     }
 
     const syncAudioToStage = () => {
+      if (document.hidden) {
+        return;
+      }
+
       if (isMusicPaused) {
         obsesionAudio.pause();
         samAudio.pause();
@@ -132,12 +136,23 @@ export default function ValentineCard() {
       syncAudioToStage();
     };
 
-    window.addEventListener('pointerdown', retryAfterInteraction, { once: true });
-    window.addEventListener('keydown', retryAfterInteraction, { once: true });
+    const retryInterval = window.setInterval(() => {
+      syncAudioToStage();
+    }, 1800);
+
+    window.addEventListener('pointerdown', retryAfterInteraction);
+    window.addEventListener('touchstart', retryAfterInteraction);
+    window.addEventListener('keydown', retryAfterInteraction);
+    window.addEventListener('click', retryAfterInteraction);
+    document.addEventListener('visibilitychange', retryAfterInteraction);
 
     return () => {
+      window.clearInterval(retryInterval);
       window.removeEventListener('pointerdown', retryAfterInteraction);
+      window.removeEventListener('touchstart', retryAfterInteraction);
       window.removeEventListener('keydown', retryAfterInteraction);
+      window.removeEventListener('click', retryAfterInteraction);
+      document.removeEventListener('visibilitychange', retryAfterInteraction);
     };
   }, [stage, isMusicPaused]);
 
