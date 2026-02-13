@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Sparkles } from 'lucide-react';
 import cupid1Img from '../../cupid1.png';
+import hiImage from '../../media/others/hi.jpg';
+import willYouImage from '../../media/others/will_you.PNG';
+import canIImage from '../../media/others/can_i.PNG';
 
 export default function QuestionStage({
   languages,
@@ -27,7 +30,9 @@ export default function QuestionStage({
   const [showMeet, setShowMeet] = useState(0);
   const [cupidClickCount, setCupidClickCount] = useState(0);
   const [secretUnlocked, setSecretUnlocked] = useState(false);
+  const [questionImageIndex, setQuestionImageIndex] = useState(0);
   const words = ['meet', 'fuck', 'piss on', 'cum on', 'lick'];
+  const questionImages = [hiImage, willYouImage];
 
   // Responsive sizing for mobile
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth <= 768);
@@ -56,6 +61,14 @@ export default function QuestionStage({
     }, 2000);
     return () => clearInterval(meetInterval);
   }, []);
+
+  useEffect(() => {
+    const imageInterval = setInterval(() => {
+      setQuestionImageIndex((prev) => (prev + 1) % questionImages.length);
+    }, 2000);
+
+    return () => clearInterval(imageInterval);
+  }, [questionImages.length]);
 
   const handleFloatingCupidClick = () => {
     if (secretUnlocked) return;
@@ -189,6 +202,29 @@ export default function QuestionStage({
         </h2>
 
         <div className="ornate-divider" style={{ margin: '30px auto' }} />
+
+        <div
+          style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            marginBottom: isMobile ? '20px' : '28px',
+          }}
+        >
+          <img
+            src={questionImages[questionImageIndex]}
+            alt=""
+            style={{
+              width: isMobile ? 'min(84vw, 280px)' : 'min(86%, 430px)',
+              height: isMobile ? '160px' : '220px',
+              objectFit: 'cover',
+              borderRadius: '16px',
+              border: '3px solid rgba(156, 39, 76, 0.2)',
+              boxShadow: '0 10px 24px rgba(156, 39, 76, 0.18)',
+              transition: 'opacity 0.4s ease-in-out',
+            }}
+          />
+        </div>
 
         {/* Multilingual question with fade effect */}
         <div
@@ -396,6 +432,27 @@ export default function QuestionStage({
               animation: 'scaleIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
           >
+            <div
+              style={{
+                marginBottom: isMobile ? '12px' : '18px',
+                display: 'flex',
+                justifyContent: 'center',
+              }}
+            >
+              <img
+                src={canIImage}
+                alt=""
+                style={{
+                  width: isMobile ? 'min(78vw, 250px)' : 'min(100%, 360px)',
+                  height: isMobile ? '145px' : '200px',
+                  objectFit: 'cover',
+                  borderRadius: '14px',
+                  border: '3px solid rgba(220, 53, 69, 0.22)',
+                  boxShadow: '0 10px 26px rgba(220, 53, 69, 0.2)',
+                }}
+              />
+            </div>
+
             <div style={{ minHeight: isMobile ? '84px' : '120px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div
                 style={{

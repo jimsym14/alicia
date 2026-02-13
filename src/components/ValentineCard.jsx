@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Pause, Play, RotateCcw, SkipBack, Volume2, VolumeX } from 'lucide-react';
 import InitialStage from './InitialStage.jsx';
 import QuestionStage from './QuestionStage.jsx';
 import FinalCardStage from './FinalCardStage.jsx';
-import obsesionTrack from '../../media/Aventura - Obsesion.mp3';
-import samGellaitryTrack from '../../media/Sam Gellaitry - Assumptions (Slowed).mp3';
+import obsesionTrack from '../../media/songs/Aventura - Obsesion.mp3';
+import samGellaitryTrack from '../../media/songs/Sam Gellaitry - Assumptions (Slowed).mp3';
 
 export default function ValentineCard() {
   const [stage, setStage] = useState('initial'); // initial, question, finalCard
@@ -39,6 +39,37 @@ export default function ValentineCard() {
       delay: Math.random() * 2,
     }))
   );
+
+  const confettiActive = showConfetti || stage === 'finalCard';
+
+  const confettiPieces = useMemo(() => {
+    if (!confettiActive) return [];
+
+    const total = 50;
+    const columns = 10;
+    const rows = Math.ceil(total / columns);
+
+    return Array.from({ length: total }, (_, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      const baseX = ((column + 0.5) / columns) * 100;
+      const jitterX = (Math.random() - 0.5) * 6;
+      const spawnYOffset = row * 8;
+
+      return {
+        id: `confetti-${index}-${Date.now()}`,
+        left: Math.max(0, Math.min(100, baseX + jitterX)),
+        top: -20 - spawnYOffset,
+        size: Math.random() * 8 + 6,
+        color: ['#dc3545', '#ff6b9d', '#ffc0cb', '#ff69b4'][
+          Math.floor(Math.random() * 4)
+        ],
+        duration: Math.random() * 2.2 + 2.2,
+        delay: Math.random() * 0.6,
+        isRound: Math.random() > 0.5,
+      };
+    });
+  }, [confettiActive]);
 
   const languages = [
     {
@@ -83,8 +114,12 @@ export default function ValentineCard() {
 
     obsesionAudio.loop = true;
     samAudio.loop = true;
+    obsesionAudio.preload = 'auto';
+    samAudio.preload = 'auto';
     obsesionAudio.volume = volumeLevel;
     samAudio.volume = volumeLevel;
+    obsesionAudio.muted = isMuted;
+    samAudio.muted = isMuted;
 
     obsesionAudioRef.current = obsesionAudio;
     samAudioRef.current = samAudio;
@@ -97,7 +132,7 @@ export default function ValentineCard() {
       obsesionAudioRef.current = null;
       samAudioRef.current = null;
     };
-  }, [volumeLevel]);
+  }, []);
 
   useEffect(() => {
     const obsesionAudio = obsesionAudioRef.current;
@@ -107,11 +142,18 @@ export default function ValentineCard() {
       return;
     }
 
-    const syncAudioToStage = () => {
-      if (document.hidden) {
-        return;
-      }
+    let isCancelled = false;
 
+    const tryPlay = async (audio) => {
+      try {
+        await audio.play();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const syncAudioToStage = async () => {
       if (isMusicPaused) {
         obsesionAudio.pause();
         samAudio.pause();
@@ -121,40 +163,58 @@ export default function ValentineCard() {
       if (stage === 'finalCard') {
         obsesionAudio.pause();
         obsesionAudio.currentTime = 0;
-        samAudio.play().catch(() => {});
+        const played = await tryPlay(samAudio);
+        if (!played && !isMuted && !isCancelled) {
+          samAudio.muted = true;
+          const mutedAutoplayWorked = await tryPlay(samAudio);
+          if (mutedAutoplayWorked) {
+            setIsMuted(true);
+          }
+        }
         return;
       }
 
       samAudio.pause();
       samAudio.currentTime = 0;
-      obsesionAudio.play().catch(() => {});
+      const played = await tryPlay(obsesionAudio);
+      if (!played && !isMuted && !isCancelled) {
+        obsesionAudio.muted = true;
+        const mutedAutoplayWorked = await tryPlay(obsesionAudio);
+        if (mutedAutoplayWorked) {
+          setIsMuted(true);
+        }
+      }
     };
 
-    syncAudioToStage();
+    void syncAudioToStage();
 
     const retryAfterInteraction = () => {
-      syncAudioToStage();
+      void syncAudioToStage();
     };
 
-    const retryInterval = window.setInterval(() => {
-      syncAudioToStage();
-    }, 1800);
+    const retryOnFocus = () => {
+      void syncAudioToStage();
+    };
 
-    window.addEventListener('pointerdown', retryAfterInteraction);
-    window.addEventListener('touchstart', retryAfterInteraction);
-    window.addEventListener('keydown', retryAfterInteraction);
-    window.addEventListener('click', retryAfterInteraction);
-    document.addEventListener('visibilitychange', retryAfterInteraction);
+    const retryOnVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void syncAudioToStage();
+      }
+    };
+
+    window.addEventListener('pointerdown', retryAfterInteraction, { once: true });
+    window.addEventListener('keydown', retryAfterInteraction, { once: true });
+    window.addEventListener('focus', retryOnFocus);
+    document.addEventListener('visibilitychange', retryOnVisibility);
 
     return () => {
-      window.clearInterval(retryInterval);
+      isCancelled = true;
       window.removeEventListener('pointerdown', retryAfterInteraction);
-      window.removeEventListener('touchstart', retryAfterInteraction);
       window.removeEventListener('keydown', retryAfterInteraction);
-      window.removeEventListener('click', retryAfterInteraction);
-      document.removeEventListener('visibilitychange', retryAfterInteraction);
+      window.removeEventListener('focus', retryOnFocus);
+      document.removeEventListener('visibilitychange', retryOnVisibility);
     };
-  }, [stage, isMusicPaused]);
+  }, [stage, isMusicPaused, isMuted]);
 
   useEffect(() => {
     if (obsesionAudioRef.current) {
@@ -879,22 +939,20 @@ export default function ValentineCard() {
       ))}
 
       {/* Confetti for yes button */}
-      {showConfetti &&
-        Array.from({ length: 50 }).map((_, i) => (
+      {confettiActive &&
+        confettiPieces.map((piece) => (
           <div
-            key={`confetti-${i}`}
+            key={piece.id}
             style={{
               position: 'absolute',
-              left: `${Math.random() * 100}%`,
-              top: -20,
-              width: Math.random() * 10 + 5,
-              height: Math.random() * 10 + 5,
-              background: ['#dc3545', '#ff6b9d', '#ffc0cb', '#ff69b4'][
-                Math.floor(Math.random() * 4)
-              ],
-              animation: `confettiFall ${Math.random() * 3 + 2}s ease-out forwards`,
-              animationDelay: `${Math.random() * 0.5}s`,
-              borderRadius: Math.random() > 0.5 ? '50%' : '0',
+              left: `${piece.left}%`,
+              top: piece.top,
+              width: piece.size,
+              height: piece.size,
+              background: piece.color,
+              animation: `confettiFall ${piece.duration}s linear infinite`,
+              animationDelay: `${-piece.delay * piece.duration}s`,
+              borderRadius: piece.isRound ? '50%' : '0',
               pointerEvents: 'none',
               zIndex: 1000,
             }}
