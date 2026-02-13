@@ -216,11 +216,13 @@ export default function QuestionStage({
             alt=""
             style={{
               width: isMobile ? 'min(84vw, 280px)' : 'min(86%, 430px)',
-              height: isMobile ? '160px' : '220px',
-              objectFit: 'cover',
+              height: 'auto',
+              maxHeight: isMobile ? '260px' : '340px',
+              objectFit: 'contain',
               borderRadius: '16px',
               border: '3px solid rgba(156, 39, 76, 0.2)',
               boxShadow: '0 10px 24px rgba(156, 39, 76, 0.18)',
+              background: 'rgba(255, 255, 255, 0.9)',
               transition: 'opacity 0.4s ease-in-out',
             }}
           />
@@ -444,11 +446,13 @@ export default function QuestionStage({
                 alt=""
                 style={{
                   width: isMobile ? 'min(78vw, 250px)' : 'min(100%, 360px)',
-                  height: isMobile ? '145px' : '200px',
-                  objectFit: 'cover',
+                  height: 'auto',
+                  maxHeight: isMobile ? '250px' : '320px',
+                  objectFit: 'contain',
                   borderRadius: '14px',
                   border: '3px solid rgba(220, 53, 69, 0.22)',
                   boxShadow: '0 10px 26px rgba(220, 53, 69, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.92)',
                 }}
               />
             </div>
