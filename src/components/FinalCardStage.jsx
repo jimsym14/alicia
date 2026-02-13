@@ -25,8 +25,17 @@ export default function FinalCardStage() {
   );
   const [carouselAngle, setCarouselAngle] = useState(0);
   const [isDraggingCarousel, setIsDraggingCarousel] = useState(false);
+  const [isSliderActive, setIsSliderActive] = useState(false);
+  const [mobileScrubOffset, setMobileScrubOffset] = useState(0);
   const [failedPhotoSources, setFailedPhotoSources] = useState(() => new Set());
   const dragStateRef = useRef({ startX: 0, startAngle: 0 });
+  const mobileScrubRef = useRef({
+    startX: 0,
+    lastX: 0,
+    lastHapticX: 0,
+    pointerId: null,
+  });
+  const animationCarryMsRef = useRef(0);
 
   const photos = useMemo(
     () => {
@@ -59,6 +68,28 @@ export default function FinalCardStage() {
     [photos, failedPhotoSources]
   );
 
+  const carouselRenderItems = useMemo(() => {
+    const total = visiblePhotos.length;
+    if (total === 0) return [];
+
+    const indexed = visiblePhotos.map((photo, index) => ({ photo, index }));
+
+    if (!isMobile || total <= 10) {
+      return indexed;
+    }
+
+    const step = 360 / total;
+    const normalizedAngle = ((carouselAngle % 360) + 360) % 360;
+    const frontIndex = ((Math.round((360 - normalizedAngle) / step) % total) + total) % total;
+    const visibleWindow = 3;
+
+    return indexed.filter(({ index }) => {
+      const rawDistance = Math.abs(index - frontIndex);
+      const circularDistance = Math.min(rawDistance, total - rawDistance);
+      return circularDistance <= visibleWindow;
+    });
+  }, [visiblePhotos, isMobile, carouselAngle]);
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
@@ -68,13 +99,20 @@ export default function FinalCardStage() {
   useEffect(() => {
     let frameId;
     let lastTime = performance.now();
+    animationCarryMsRef.current = 0;
 
     const animate = (currentTime) => {
       const deltaMs = currentTime - lastTime;
       lastTime = currentTime;
+      animationCarryMsRef.current += deltaMs;
 
-      if (!isDraggingCarousel) {
-        setCarouselAngle((prev) => (prev - deltaMs * 0.0035) % 360);
+      if (!isDraggingCarousel && !isSliderActive) {
+        const frameBudgetMs = isMobile ? 78 : 30;
+        if (animationCarryMsRef.current >= frameBudgetMs) {
+          const elapsed = animationCarryMsRef.current;
+          animationCarryMsRef.current = 0;
+          setCarouselAngle((prev) => (prev - elapsed * 0.0035) % 360);
+        }
       }
 
       frameId = requestAnimationFrame(animate);
@@ -83,7 +121,7 @@ export default function FinalCardStage() {
     frameId = requestAnimationFrame(animate);
 
     return () => cancelAnimationFrame(frameId);
-  }, [isDraggingCarousel]);
+  }, [isDraggingCarousel, isMobile, isSliderActive]);
 
   const handleCarouselPointerDown = (event) => {
     event.preventDefault();
@@ -108,6 +146,56 @@ export default function FinalCardStage() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  };
+
+  const triggerHapticPulse = () => {
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+      return;
+    }
+
+    navigator.vibrate(8);
+  };
+
+  const handleMobileScrubPointerDown = (event) => {
+    setIsSliderActive(true);
+    mobileScrubRef.current = {
+      startX: event.clientX,
+      lastX: event.clientX,
+      lastHapticX: event.clientX,
+      pointerId: event.pointerId,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleMobileScrubPointerMove = (event) => {
+    if (!isSliderActive || mobileScrubRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaSinceLast = event.clientX - mobileScrubRef.current.lastX;
+    if (deltaSinceLast !== 0) {
+      setCarouselAngle((prev) => (prev + deltaSinceLast * 0.95) % 360);
+      mobileScrubRef.current.lastX = event.clientX;
+    }
+
+    const deltaFromStart = event.clientX - mobileScrubRef.current.startX;
+    const clampedOffset = Math.max(-72, Math.min(72, deltaFromStart));
+    setMobileScrubOffset(clampedOffset);
+
+    if (Math.abs(event.clientX - mobileScrubRef.current.lastHapticX) >= 18) {
+      triggerHapticPulse();
+      mobileScrubRef.current.lastHapticX = event.clientX;
+    }
+  };
+
+  const handleMobileScrubPointerUp = (event) => {
+    if (mobileScrubRef.current.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setIsSliderActive(false);
+    setMobileScrubOffset(0);
+    mobileScrubRef.current.pointerId = null;
   };
 
   const handlePhotoLoadError = (source) => {
@@ -138,9 +226,9 @@ export default function FinalCardStage() {
           display: flex;
           justify-content: center;
           align-items: center;
-          overflow: hidden;
-          height: 460px;
-          touch-action: none;
+          overflow: visible;
+          height: 560px;
+          touch-action: pan-y;
           user-select: none;
           cursor: grab;
           position: relative;
@@ -167,10 +255,13 @@ export default function FinalCardStage() {
           top: 50%;
           left: 50%;
           width: var(--card-w);
-          transform: translate(-50%, -50%) translate(var(--x), var(--y)) scale(var(--scale)) rotate(var(--tilt));
+          transform: translate3d(-50%, -50%, 0) translate3d(var(--x), var(--y), 0) scale(var(--scale)) rotate(var(--tilt));
           opacity: var(--opacity);
           z-index: var(--z);
           transition: opacity 0.2s linear;
+          will-change: transform, opacity;
+          contain: layout style;
+          backface-visibility: hidden;
         }
 
         .polaroid-frame {
@@ -178,7 +269,10 @@ export default function FinalCardStage() {
           border-radius: 8px;
           padding: 8px 8px 10px;
           border: 1px solid rgba(0, 0, 0, 0.08);
-          box-shadow: 0 18px 30px rgba(0, 0, 0, 0.24);
+          box-shadow:
+            0 20px 28px rgba(0, 0, 0, 0.34),
+            0 10px 12px rgba(0, 0, 0, 0.2),
+            0 2px 2px rgba(0, 0, 0, 0.16);
         }
 
         .golden-love-frame {
@@ -232,9 +326,76 @@ export default function FinalCardStage() {
           width: 100%;
         }
 
+        .mobile-carousel-scrubber {
+          position: relative;
+          width: 100%;
+          height: 58px;
+          border-radius: 999px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 240, 247, 0.94));
+          border: 2px solid rgba(156, 39, 76, 0.2);
+          box-shadow: 0 10px 22px rgba(156, 39, 76, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+          overflow: hidden;
+          touch-action: pan-x;
+          user-select: none;
+        }
+
+        .mobile-carousel-scrubber::before {
+          content: '⇠  slide for memories  ⇢';
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          font-family: 'BabyDoll', 'Crimson Text', serif;
+          font-size: 0.9rem;
+          letter-spacing: 0.08em;
+          color: rgba(120, 34, 65, 0.78);
+          white-space: nowrap;
+          pointer-events: none;
+        }
+
+        .mobile-carousel-scrubber::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(105deg, rgba(255, 255, 255, 0) 26%, rgba(255, 255, 255, 0.55) 50%, rgba(255, 255, 255, 0) 74%);
+          transform: translateX(-130%);
+          animation: scrubberGlow 2.6s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        .mobile-carousel-handle {
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          width: 66px;
+          height: 40px;
+          border-radius: 999px;
+          transform: translate(-50%, -50%) translateX(var(--scrub-offset));
+          background: linear-gradient(180deg, #dc3545 0%, #9c274c 100%);
+          border: 2px solid rgba(255, 255, 255, 0.96);
+          box-shadow: 0 8px 16px rgba(156, 39, 76, 0.28);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 1rem;
+          font-weight: 700;
+          pointer-events: none;
+        }
+
+        @keyframes scrubberGlow {
+          0% { transform: translateX(-130%); }
+          100% { transform: translateX(130%); }
+        }
+
         @media (max-width: 768px) {
           .polaroid-scene {
-            height: 330px;
+            height: 430px;
+          }
+
+          .polaroid-frame {
+            box-shadow: none;
+            border: 1px solid rgba(0, 0, 0, 0.14);
           }
 
           .polaroid-disk {
@@ -316,14 +477,20 @@ export default function FinalCardStage() {
           {visiblePhotos.length > 0 ? (
             <div
               className="polaroid-scene"
-              style={{ padding: '8px 0', marginBottom: isMobile ? '26px' : '40px' }}
-              onPointerDown={handleCarouselPointerDown}
-              onPointerMove={handleCarouselPointerMove}
-              onPointerUp={handleCarouselPointerUp}
-              onPointerCancel={handleCarouselPointerUp}
+              style={{
+                width: isMobile ? '100%' : '60vw',
+                maxWidth: isMobile ? '100%' : '980px',
+                padding: '8px 0',
+                marginBottom: isMobile ? '72px' : '108px',
+                cursor: isMobile ? 'default' : 'grab',
+              }}
+              onPointerDown={isMobile ? undefined : handleCarouselPointerDown}
+              onPointerMove={isMobile ? undefined : handleCarouselPointerMove}
+              onPointerUp={isMobile ? undefined : handleCarouselPointerUp}
+              onPointerCancel={isMobile ? undefined : handleCarouselPointerUp}
             >
               <div className="polaroid-disk" />
-              {visiblePhotos.map((photo, index) => {
+              {carouselRenderItems.map(({ photo, index }) => {
                 const count = Math.max(visiblePhotos.length, 1);
                 const angleDeg = (360 / count) * index + carouselAngle;
                 const angleRad = (angleDeg * Math.PI) / 180;
@@ -347,8 +514,8 @@ export default function FinalCardStage() {
                       '--scale': scale,
                       '--opacity': opacity,
                       '--z': z,
-                      '--card-w': isMobile ? '136px' : '190px',
-                      '--img-h': isMobile ? '148px' : '208px',
+                      '--card-w': isMobile ? '126px' : '190px',
+                      '--img-h': isMobile ? '136px' : '208px',
                       '--tilt': tilt,
                     }}
                   >
@@ -358,6 +525,8 @@ export default function FinalCardStage() {
                           src={photo.src}
                           alt=""
                           draggable={false}
+                          loading="lazy"
+                          decoding="async"
                           onError={() => handlePhotoLoadError(photo.src)}
                         />
                       </div>
@@ -376,8 +545,44 @@ export default function FinalCardStage() {
                 fontSize: isMobile ? '1rem' : '1.1rem',
               }}
             >
-              No photos found in media/lici.
+              No photos found in media/carousel.
             </p>
+          )}
+
+          {isMobile && visiblePhotos.length > 0 && (
+            <div
+              style={{
+                width: 'min(92vw, 420px)',
+                marginTop: '-48px',
+                marginBottom: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <div
+                className="mobile-carousel-scrubber"
+                onPointerDown={handleMobileScrubPointerDown}
+                onPointerMove={handleMobileScrubPointerMove}
+                onPointerUp={handleMobileScrubPointerUp}
+                onPointerCancel={handleMobileScrubPointerUp}
+                aria-label="Slide left or right to scroll memories"
+                role="slider"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={50}
+              >
+                <div
+                  className="mobile-carousel-handle"
+                  style={{
+                    '--scrub-offset': `${mobileScrubOffset}px`,
+                  }}
+                >
+                  ↔
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </section>
