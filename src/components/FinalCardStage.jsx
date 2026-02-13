@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Heart, Home } from 'lucide-react';
+import { Heart } from 'lucide-react';
 
 const photoModules = import.meta.glob(
   '../../media/lici/*.{jpg,jpeg,png,webp,avif,JPG,JPEG,PNG,WEBP,AVIF}',
@@ -18,7 +18,7 @@ const videoModules = import.meta.glob(
 );
 
 // Stage 3: section-based memories page
-export default function FinalCardStage({ onBackToQuestion, onRestart, onSparkle }) {
+export default function FinalCardStage() {
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' && window.innerWidth <= 768
   );
@@ -65,7 +65,7 @@ export default function FinalCardStage({ onBackToQuestion, onRestart, onSparkle 
         position: 'relative',
         background: 'transparent',
         overflowX: 'hidden',
-        paddingTop: isMobile ? '74px' : 0,
+        paddingTop: 0,
       }}
     >
       <style>{`
@@ -80,68 +80,6 @@ export default function FinalCardStage({ onBackToQuestion, onRestart, onSparkle 
           animation-play-state: paused;
         }
       `}</style>
-
-      <div
-        style={{
-          position: 'fixed',
-          top: isMobile ? '8px' : '20px',
-          left: isMobile ? 0 : '20px',
-          right: isMobile ? 0 : 'auto',
-          display: 'flex',
-          gap: '10px',
-          justifyContent: isMobile ? 'center' : 'flex-start',
-          padding: isMobile ? '0 8px' : 0,
-          zIndex: 1000,
-        }}
-      >
-        <button
-          onClick={onBackToQuestion}
-          className="hover-lift"
-          style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid rgba(156, 39, 76, 0.3)',
-            borderRadius: '50px',
-            padding: isMobile ? '10px 16px' : '12px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? '6px' : '8px',
-            cursor: 'pointer',
-            fontFamily: "'Crimson Text', serif",
-            fontSize: isMobile ? '0.95rem' : '1rem',
-            color: '#9c274c',
-            fontWeight: 600,
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
-          }}
-          onMouseEnter={() => onSparkle(3)}
-        >
-          <ArrowLeft size={isMobile ? 18 : 20} />
-          Back
-        </button>
-
-        <button
-          onClick={onRestart}
-          className="hover-lift"
-          style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            border: '2px solid rgba(156, 39, 76, 0.3)',
-            borderRadius: '50px',
-            padding: isMobile ? '10px 16px' : '12px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? '6px' : '8px',
-            cursor: 'pointer',
-            fontFamily: "'Crimson Text', serif",
-            fontSize: isMobile ? '0.95rem' : '1rem',
-            color: '#9c274c',
-            fontWeight: 600,
-            boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
-          }}
-          onMouseEnter={() => onSparkle(3)}
-        >
-          <Home size={isMobile ? 18 : 20} />
-          Start Over
-        </button>
-      </div>
 
       <section
         style={{

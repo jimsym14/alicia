@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Heart, Volume2, VolumeX } from 'lucide-react';
+import { Heart, Pause, Play, RotateCcw, SkipBack, Volume2, VolumeX } from 'lucide-react';
 import InitialStage from './InitialStage.jsx';
 import QuestionStage from './QuestionStage.jsx';
 import FinalCardStage from './FinalCardStage.jsx';
@@ -21,6 +21,10 @@ export default function ValentineCard() {
   const [noButtonRotation, setNoButtonRotation] = useState(0);
   const [letterVisible, setLetterVisible] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [isMusicPaused, setIsMusicPaused] = useState(false);
+  const [volumeLevel, setVolumeLevel] = useState(0.7);
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [trackDuration, setTrackDuration] = useState(0);
   const obsesionAudioRef = useRef(null);
   const samAudioRef = useRef(null);
   const FADE_DURATION_MS = 2000;
@@ -79,8 +83,8 @@ export default function ValentineCard() {
 
     obsesionAudio.loop = true;
     samAudio.loop = true;
-    obsesionAudio.volume = 0.7;
-    samAudio.volume = 0.7;
+    obsesionAudio.volume = volumeLevel;
+    samAudio.volume = volumeLevel;
 
     obsesionAudioRef.current = obsesionAudio;
     samAudioRef.current = samAudio;
@@ -93,7 +97,7 @@ export default function ValentineCard() {
       obsesionAudioRef.current = null;
       samAudioRef.current = null;
     };
-  }, []);
+  }, [volumeLevel]);
 
   useEffect(() => {
     const obsesionAudio = obsesionAudioRef.current;
@@ -104,6 +108,12 @@ export default function ValentineCard() {
     }
 
     const syncAudioToStage = () => {
+      if (isMusicPaused) {
+        obsesionAudio.pause();
+        samAudio.pause();
+        return;
+      }
+
       if (stage === 'finalCard') {
         obsesionAudio.pause();
         obsesionAudio.currentTime = 0;
@@ -129,7 +139,7 @@ export default function ValentineCard() {
       window.removeEventListener('pointerdown', retryAfterInteraction);
       window.removeEventListener('keydown', retryAfterInteraction);
     };
-  }, [stage]);
+  }, [stage, isMusicPaused]);
 
   useEffect(() => {
     if (obsesionAudioRef.current) {
@@ -140,8 +150,91 @@ export default function ValentineCard() {
     }
   }, [isMuted]);
 
+  useEffect(() => {
+    if (obsesionAudioRef.current) {
+      obsesionAudioRef.current.volume = volumeLevel;
+    }
+    if (samAudioRef.current) {
+      samAudioRef.current.volume = volumeLevel;
+    }
+  }, [volumeLevel]);
+
   const handleToggleMute = () => {
     setIsMuted((prev) => !prev);
+  };
+
+  const handleTogglePauseMusic = () => {
+    setIsMusicPaused((prev) => !prev);
+  };
+
+  const handleVolumeChange = (event) => {
+    const nextVolume = Number(event.target.value);
+    setVolumeLevel(nextVolume);
+    if (isMuted && nextVolume > 0) {
+      setIsMuted(false);
+    }
+  };
+
+  const getActiveAudio = () =>
+    stage === 'finalCard' ? samAudioRef.current : obsesionAudioRef.current;
+
+  useEffect(() => {
+    const activeAudio = getActiveAudio();
+
+    if (!activeAudio) {
+      setPlaybackTime(0);
+      setTrackDuration(0);
+      return;
+    }
+
+    const syncProgress = () => {
+      setPlaybackTime(activeAudio.currentTime || 0);
+      setTrackDuration(Number.isFinite(activeAudio.duration) ? activeAudio.duration : 0);
+    };
+
+    syncProgress();
+
+    activeAudio.addEventListener('timeupdate', syncProgress);
+    activeAudio.addEventListener('loadedmetadata', syncProgress);
+    activeAudio.addEventListener('durationchange', syncProgress);
+
+    return () => {
+      activeAudio.removeEventListener('timeupdate', syncProgress);
+      activeAudio.removeEventListener('loadedmetadata', syncProgress);
+      activeAudio.removeEventListener('durationchange', syncProgress);
+    };
+  }, [stage]);
+
+  const handleSeek = (event) => {
+    const nextTime = Number(event.target.value);
+    const activeAudio = getActiveAudio();
+    if (!activeAudio) return;
+    activeAudio.currentTime = nextTime;
+    setPlaybackTime(nextTime);
+  };
+
+  const formatTime = (seconds) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60)
+      .toString()
+      .padStart(2, '0');
+    return `${minutes}:${secs}`;
+  };
+
+  const handleGlobalBack = () => {
+    if (stage === 'finalCard') {
+      handleBackToQuestionFromFinal();
+      return;
+    }
+
+    if (stage === 'question') {
+      handleBackToInitialFromQuestion();
+    }
+  };
+
+  const handleGlobalRestart = () => {
+    handleRestartFromFinal();
   };
 
   const handleCycleLanguage = () => {
@@ -275,6 +368,8 @@ export default function ValentineCard() {
             : 'linear-gradient(135deg, #fff5f7 0%, #ffe4e9 25%, #ffd4dc 50%, #ffc0cb 75%, #ffb3c1 100%)',
         position: 'relative',
         overflow: 'hidden',
+        paddingTop: 'clamp(108px, 16vw, 148px)',
+        boxSizing: 'border-box',
         userSelect: 'none',
         WebkitUserSelect: 'none',
       }}
@@ -512,30 +607,94 @@ export default function ValentineCard() {
           animation: floatHeartMonogram 15s ease-in-out infinite;
         }
 
-        .music-pill {
+        .top-nav-pill {
           position: fixed;
-          top: 14px;
-          right: 14px;
-          z-index: 1600;
-          border: 2px solid rgba(156, 39, 76, 0.25);
-          background: rgba(255, 255, 255, 0.95);
-          border-radius: 999px;
-          padding: 8px 14px;
-          display: inline-flex;
+          top: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          z-index: 1900;
+          width: min(96vw, 920px);
+          display: flex;
           align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
           gap: 8px;
-          color: #9c274c;
-          font-family: 'Crimson Text', serif;
-          font-size: 0.95rem;
-          font-weight: 700;
-          cursor: pointer;
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+          padding: 10px 12px;
+          border-radius: 999px;
+          border: 1px solid rgba(255, 255, 255, 0.75);
+          background: rgba(255, 255, 255, 0.72);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          box-shadow: 0 14px 28px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
           transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .music-pill:hover {
+        .top-nav-pill:hover {
+          transform: translateX(-50%) translateY(-1px);
+          box-shadow: 0 18px 30px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+        }
+
+        .top-nav-btn {
+          border: 1px solid rgba(156, 39, 76, 0.2);
+          background: #ffffff;
+          color: #9c274c;
+          border-radius: 999px;
+          height: 36px;
+          padding: 0 14px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-family: 'Crimson Text', serif;
+          font-size: 0.92rem;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+          box-shadow: 0 4px 10px rgba(156, 39, 76, 0.1);
+          transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .nav-btn-label {
+          display: inline;
+        }
+
+        .top-nav-btn:hover {
           transform: translateY(-1px);
-          box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+          box-shadow: 0 7px 14px rgba(156, 39, 76, 0.16);
+        }
+
+        .top-nav-slider-wrap {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ffffff;
+          border: 1px solid rgba(156, 39, 76, 0.15);
+          border-radius: 999px;
+          height: 36px;
+          padding: 0 10px;
+          box-shadow: 0 4px 10px rgba(156, 39, 76, 0.08);
+        }
+
+        .top-nav-progress {
+          width: min(30vw, 220px);
+          min-width: 120px;
+          accent-color: #dc3545;
+          cursor: pointer;
+        }
+
+        .top-nav-volume {
+          width: min(16vw, 110px);
+          min-width: 72px;
+          accent-color: #dc3545;
+          cursor: pointer;
+        }
+
+        .top-nav-time {
+          font-family: 'Crimson Text', serif;
+          font-size: 0.82rem;
+          color: #9c274c;
+          min-width: 74px;
+          text-align: right;
+          font-weight: 700;
         }
 
         /* Mobile tweaks */
@@ -576,12 +735,40 @@ export default function ValentineCard() {
             margin: 0 auto;
           }
 
-          .music-pill {
+          .top-nav-pill {
             top: 10px;
-            right: 10px;
-            padding: 7px 11px;
+            padding: 8px 9px;
             gap: 6px;
-            font-size: 0.85rem;
+            width: min(96vw, 430px);
+          }
+
+          .top-nav-btn {
+            height: 32px;
+            padding: 0 10px;
+            font-size: 0.78rem;
+          }
+
+          .nav-btn-label {
+            display: none;
+          }
+
+          .top-nav-slider-wrap {
+            height: 32px;
+            padding: 0 8px;
+          }
+
+          .top-nav-progress {
+            width: min(26vw, 108px);
+            min-width: 72px;
+          }
+
+          .top-nav-volume {
+            width: min(20vw, 86px);
+            min-width: 58px;
+          }
+
+          .top-nav-time {
+            display: none;
           }
 
           body {
@@ -590,10 +777,52 @@ export default function ValentineCard() {
         }
       `}</style>
 
-      <button className="music-pill" onClick={handleToggleMute} aria-label="Toggle music mute">
-        {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        {isMuted ? 'Music Off' : 'Music On'}
-      </button>
+      <div className="top-nav-pill" role="navigation" aria-label="Top navigation controls">
+        <button className="top-nav-btn" onClick={handleGlobalBack} aria-label="Go back">
+          <SkipBack size={14} />
+          <span className="nav-btn-label">Back</span>
+        </button>
+        <button className="top-nav-btn" onClick={handleGlobalRestart} aria-label="Restart">
+          <RotateCcw size={14} />
+          <span className="nav-btn-label">Restart</span>
+        </button>
+        <button className="top-nav-btn" onClick={handleTogglePauseMusic} aria-label="Pause or play music">
+          {isMusicPaused ? <Play size={14} /> : <Pause size={14} />}
+          <span className="nav-btn-label">{isMusicPaused ? 'Play' : 'Pause'}</span>
+        </button>
+        <button className="top-nav-btn" onClick={handleToggleMute} aria-label="Toggle music mute">
+          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          <span className="nav-btn-label">{isMuted ? 'Muted' : 'Music'}</span>
+        </button>
+        <div className="top-nav-slider-wrap">
+          <input
+            className="top-nav-progress"
+            type="range"
+            min={0}
+            max={trackDuration > 0 ? trackDuration : 1}
+            step={0.1}
+            value={Math.min(playbackTime, trackDuration || 1)}
+            onChange={handleSeek}
+            aria-label="Song progress"
+          />
+        </div>
+        <div className="top-nav-slider-wrap">
+          {isMuted ? <VolumeX size={14} color="#9c274c" /> : <Volume2 size={14} color="#9c274c" />}
+          <input
+            className="top-nav-volume"
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volumeLevel}
+            onChange={handleVolumeChange}
+            aria-label="Volume control"
+          />
+        </div>
+        <span className="top-nav-time">
+          {formatTime(playbackTime)} / {formatTime(trackDuration)}
+        </span>
+      </div>
 
       {/* Floating heart particles (Lucide hearts) */}
       {particles.map((particle) => (

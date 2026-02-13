@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Sparkles, ArrowLeft } from 'lucide-react';
+import { Heart, Sparkles } from 'lucide-react';
 import cupid1Img from '../../cupid1.png';
 
 export default function QuestionStage({
@@ -94,35 +94,6 @@ export default function QuestionStage({
         }
       `}</style>
 
-      {/* Back button */}
-      <button
-        onClick={onBack}
-        className="hover-lift"
-        style={{
-          position: 'absolute',
-          top: '20px',
-          left: '20px',
-          background: 'rgba(255, 255, 255, 0.9)',
-          border: '2px solid rgba(156, 39, 76, 0.3)',
-          borderRadius: '50px',
-          padding: '12px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          cursor: 'pointer',
-          fontFamily: "'Crimson Text', serif",
-          fontSize: '1rem',
-          color: '#9c274c',
-          fontWeight: 600,
-          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
-          zIndex: 100,
-        }}
-        onMouseEnter={() => onSparkle(3)}
-      >
-        <ArrowLeft size={20} />
-        Back
-      </button>
-
       {!secretUnlocked && (
         <button
           onClick={handleFloatingCupidClick}
@@ -168,7 +139,7 @@ export default function QuestionStage({
           border: '4px solid rgba(156, 39, 76, 0.2)',
           position: 'relative',
           animation: 'scaleIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          marginTop: isMobile ? '72px' : 0,
+          marginTop: 0,
         }}
       >
 
